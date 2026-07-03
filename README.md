@@ -68,17 +68,38 @@ This command builds the multi-stage frontend container, creates the backend cont
 
 ### Step 1: Clone & Configure Database
 
-We provide a `docker-compose.yml` to spin up PostgreSQL automatically. Run:
+## 🐳 Dockerized Multi-Stage Setup
 
+We provide a multi-stage `docker-compose.yml` configuration supporting hot-reloading (via TSX watcher and volume mounts) and automatic seeding.
+
+### Step 1: Initialize configurations and build containers
+Copy the root example environment file and launch the compose stack:
 ```bash
-docker-compose up -d
-```
+# 1. Copy environment definitions
+cp .env.example .env
 
-*Note: If you have a local PostgreSQL running on port 5432, you can use that instead. Simply update the database credentials in `/backend/.env`.*
+# 2. Build and launch services in detached mode
+docker-compose up --build -d
+```
+*Once booted:*
+- **Frontend React Dashboard**: 👉 **[http://localhost:3000](http://localhost:3000)** (mapped from container port `80` to host `3000`)
+- **Backend Express API Direct**: **[http://localhost:5050](http://localhost:5050)** (mapped from container `5000` to host `5050`)
+- **PostgreSQL Database Listener**: Port `5433` on host (mapped to container port `5432`)
+- **Interactive Swagger Docs**: 👉 **[http://localhost:3000/api-docs](http://localhost:3000/api-docs)** (or directly at `http://localhost:5050/api-docs`)
+
+### Step 2: Automatic Database Seeding
+On container launch, the database automatically initializes tables and inserts the following credentials:
+*   **Admin Account**: `admin@accessguard.com` (password: `password123`)
+*   **User Account**: `user@accessguard.com` (password: `password123`)
 
 ---
 
-### Step 2: Configure Backend Environment
+## 💻 Native Host Setup (Alternative)
+
+If you prefer to run services natively on the host machine:
+
+### Step 3: Run Database Service
+Ensure you have a local PostgreSQL instance running. Standard database credentials can be configured inside `/backend/.env` or the root `.env`.
 
 1. Navigate to `/backend`:
    ```bash
@@ -135,11 +156,27 @@ This sandbox lists all authentication, profile retrieval, and task routes. You c
 
 ### 2. Frontend Interface
 Open your browser and navigate to:
-👉 **[http://localhost:5173](http://localhost:5173)**
+*   **Docker Compose**: 👉 **[http://localhost:3000](http://localhost:3000)**
+*   **Native Host**: 👉 **[http://localhost:5173](http://localhost:5173)**
 
 - Register as a `USER` -> Create, edit, and delete tasks. You will only see and modify your own tasks.
 - Register as an `ADMIN` -> You can create tasks and optionally assign them to any user's UUID. You will also see all user tasks across the database, with full permissions to edit or delete them.
 - Logout -> The backend clears the cookie session, securing the endpoint immediately.
+
+### 3. Automated Integration Tests
+AccessGuard includes a comprehensive integration test suite built with **Vitest** and **Supertest**. It verifies user registration, login, cookie assignments, and task CRUD validations.
+
+To run the test suite:
+*   **Via Docker Container**:
+    ```bash
+    docker-compose exec backend npm run test
+    ```
+*   **Natively on Host**:
+    Ensure the `DATABASE_URL` environment points to an active PostgreSQL instance, then run:
+    ```bash
+    cd backend
+    npm run test
+    ```
 
 ---
 
