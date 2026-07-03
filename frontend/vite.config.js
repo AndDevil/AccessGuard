@@ -12,6 +12,11 @@ export default defineConfig({
         changeOrigin: true,
         secure: false,
       },
+      '/api-docs': {
+        target: 'http://backend:5000',
+        changeOrigin: true,
+        secure: false,
+      },
     },
   },
 })

@@ -39,8 +39,12 @@ const swaggerOptions: swaggerJsdoc.Options = {
     },
     servers: [
       {
+        url: '/api/v1',
+        description: 'Default API Gateway (Relative)',
+      },
+      {
         url: 'http://localhost:5050/api/v1',
-        description: 'V1 API Server',
+        description: 'Direct API Server (Host Access)',
       },
     ],
     components: {
