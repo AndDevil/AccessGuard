@@ -2,6 +2,7 @@ import bcrypt from 'bcryptjs';
 import { prisma } from '../utils/prismaClient';
 import { generateToken, TokenPayload } from '../utils/jwtUtils';
 import { RegisterInput, LoginInput } from '../controllers/authController';
+import { AppError } from '../utils/AppError';
 
 export class AuthService {
   /**
@@ -13,9 +14,7 @@ export class AuthService {
     });
 
     if (existingUser) {
-      const error: any = new Error('Email is already in use');
-      error.statusCode = 400;
-      throw error;
+      throw new AppError('Email is already in use', 400);
     }
 
     // Adaptive bcrypt hashing (rounds = 10 is standard for performance & safety)
@@ -43,31 +42,16 @@ export class AuthService {
     });
 
     if (!user) {
-      const error: any = new Error('Invalid email or password');
-      error.statusCode = 401;
-      throw error;
+      throw new AppError('Invalid email or password', 401);
     }
 
     const isPasswordValid = await bcrypt.compare(input.password, user.password);
     if (!isPasswordValid) {
-      const error: any = new Error('Invalid email or password');
-      error.statusCode = 401;
-      throw error;
+      throw new AppError('Invalid email or password', 401);
     }
 
-    // Generate JWT
-    const payload: TokenPayload = {
-      userId: user.id,
-      email: user.email,
-      role: user.role,
-    };
-    const token = generateToken(payload);
-
     const { password, ...userWithoutPassword } = user;
-    return {
-      token,
-      user: userWithoutPassword,
-    };
+    return userWithoutPassword;
   }
 
   /**
@@ -79,9 +63,7 @@ export class AuthService {
     });
 
     if (!user) {
-      const error: any = new Error('User not found');
-      error.statusCode = 404;
-      throw error;
+      throw new AppError('User not found', 404);
     }
 
     const { password, ...userWithoutPassword } = user;

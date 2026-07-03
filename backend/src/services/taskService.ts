@@ -1,6 +1,7 @@
 import { prisma } from '../utils/prismaClient';
 import { TokenPayload } from '../utils/jwtUtils';
 import { TaskStatus } from '@prisma/client';
+import { AppError } from '../utils/AppError';
 
 export interface CreateTaskInput {
   title: string;
@@ -30,9 +31,7 @@ export class TaskService {
       where: { id: assignedUserId }
     });
     if (!userExists) {
-      const error: any = new Error('Assigned user not found');
-      error.statusCode = 404;
-      throw error;
+      throw new AppError('Assigned user not found', 404);
     }
 
     return await prisma.task.create({
@@ -97,16 +96,12 @@ export class TaskService {
     });
 
     if (!task) {
-      const error: any = new Error('Task not found');
-      error.statusCode = 404;
-      throw error;
+      throw new AppError('Task not found', 404);
     }
 
     // Role-based visibility enforcement
     if (currentUser.role !== 'ADMIN' && task.userId !== currentUser.userId) {
-      const error: any = new Error('Access denied. You do not own this task.');
-      error.statusCode = 403;
-      throw error;
+      throw new AppError('Access denied. You do not own this task.', 403);
     }
 
     return task;
@@ -121,16 +116,12 @@ export class TaskService {
     });
 
     if (!task) {
-      const error: any = new Error('Task not found');
-      error.statusCode = 404;
-      throw error;
+      throw new AppError('Task not found', 404);
     }
 
     // RBAC validation
     if (currentUser.role !== 'ADMIN' && task.userId !== currentUser.userId) {
-      const error: any = new Error('Access denied. You cannot edit this task.');
-      error.statusCode = 403;
-      throw error;
+      throw new AppError('Access denied. You cannot edit this task.', 403);
     }
 
     return await prisma.task.update({
@@ -157,16 +148,12 @@ export class TaskService {
     });
 
     if (!task) {
-      const error: any = new Error('Task not found');
-      error.statusCode = 404;
-      throw error;
+      throw new AppError('Task not found', 404);
     }
 
     // RBAC validation
     if (currentUser.role !== 'ADMIN' && task.userId !== currentUser.userId) {
-      const error: any = new Error('Access denied. You cannot delete this task.');
-      error.statusCode = 403;
-      throw error;
+      throw new AppError('Access denied. You cannot delete this task.', 403);
     }
 
     await prisma.task.delete({

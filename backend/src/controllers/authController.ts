@@ -2,6 +2,8 @@ import { Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { AuthService } from '../services/authService';
 import { logger } from '../utils/logger';
+import { generateAccessToken, generateRefreshToken, verifyRefreshToken, TokenPayload } from '../utils/jwtUtils';
+import { AppError } from '../utils/AppError';
 
 // Input Validation Schemas
 export const RegisterSchema = z.object({
@@ -38,27 +40,45 @@ export class AuthController {
   }
 
   /**
-   * Handle user login. Sets HttpOnly cookie for security and returns profile + token backup.
+   * Handle user login. Sets HttpOnly cookies for security and returns profile + token.
    */
   static async login(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       logger.info(`Processing login request for: ${req.body.email}`);
-      const { token, user } = await AuthService.login(req.body);
+      const user = await AuthService.login(req.body);
 
-      // Security measure: Store JWT in HttpOnly cookie to mitigate XSS attacks
-      const cookieExpireDays = parseInt(process.env.COOKIE_EXPIRE_DAYS || '1', 10);
-      res.cookie('token', token, {
-        httpOnly: true, // Prevents JavaScript from reading the cookie
-        secure: process.env.NODE_ENV === 'production', // Only send over HTTPS in production
-        sameSite: 'strict', // Mitigates CSRF requests
-        maxAge: cookieExpireDays * 24 * 60 * 60 * 1000, // Expiration
+      // Construct JWT claim payload
+      const payload: TokenPayload = {
+        userId: user.id,
+        email: user.email,
+        role: user.role,
+      };
+
+      // Issue dual tokens: short-lived access and long-lived refresh
+      const accessToken = generateAccessToken(payload);
+      const refreshToken = generateRefreshToken(payload);
+
+      // Access Token cookie (expires in 15 mins)
+      res.cookie('token', accessToken, {
+        httpOnly: true, // Prevents client JavaScript read access (mitigates XSS)
+        secure: process.env.NODE_ENV === 'production', // Encrypts transit over HTTPS only
+        sameSite: 'strict', // Mitigates Cross-Site Request Forgery (CSRF)
+        maxAge: 15 * 60 * 1000,
+      });
+
+      // Refresh Token cookie (expires in 7 days)
+      res.cookie('refreshToken', refreshToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        maxAge: 7 * 24 * 60 * 60 * 1000,
       });
 
       res.status(200).json({
         status: 'success',
         statusCode: 200,
         message: 'Login successful',
-        token, // Included for non-browser testing tools like Swagger/Postman
+        token: accessToken, // Provided for headless testing tools (Swagger/Postman)
         data: { user },
       });
     } catch (error) {
@@ -67,16 +87,73 @@ export class AuthController {
   }
 
   /**
-   * Handle user logout by clearing the authentication token cookie.
+   * Rotate access tokens when the client's current session expires.
+   * Reads from a separate HttpOnly refreshToken cookie.
+   */
+  static async refresh(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      logger.info('Processing token refresh rotation');
+      const refreshToken = req.cookies?.refreshToken;
+
+      if (!refreshToken) {
+        throw new AppError('Session expired. Please log in again.', 401);
+      }
+
+      try {
+        const decoded = verifyRefreshToken(refreshToken);
+
+        // Sign new short-lived access token
+        const newPayload: TokenPayload = {
+          userId: decoded.userId,
+          email: decoded.email,
+          role: decoded.role,
+        };
+        const newAccessToken = generateAccessToken(newPayload);
+
+        // Update token cookie
+        res.cookie('token', newAccessToken, {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'strict',
+          maxAge: 15 * 60 * 1000,
+        });
+
+        res.status(200).json({
+          status: 'success',
+          statusCode: 200,
+          message: 'Token successfully rotated',
+          token: newAccessToken,
+        });
+      } catch (err) {
+        logger.warn('Failed validation check on refresh token cookie');
+        throw new AppError('Session expired. Please sign in again.', 401);
+      }
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Handle user logout by clearing the authentication token cookies.
    */
   static async logout(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       logger.info('Processing logout request');
+      
+      // Clear token cookie
       res.clearCookie('token', {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'strict',
       });
+
+      // Clear refresh token cookie
+      res.clearCookie('refreshToken', {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+      });
+
       res.status(200).json({
         status: 'success',
         statusCode: 200,
@@ -93,12 +170,7 @@ export class AuthController {
   static async me(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       if (!req.user) {
-        res.status(401).json({
-          status: 'error',
-          statusCode: 401,
-          message: 'Unauthorized profile request.',
-        });
-        return;
+        throw new AppError('Unauthorized profile request.', 401);
       }
 
       logger.info(`Fetching profile for user: ${req.user.email}`);

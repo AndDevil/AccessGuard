@@ -86,6 +86,20 @@ router.post('/logout', AuthController.logout);
 
 /**
  * @swagger
+ * /auth/refresh:
+ *   post:
+ *     summary: Rotate access token using HttpOnly refresh cookie
+ *     tags: [Authentication]
+ *     responses:
+ *       200:
+ *         description: Token successfully rotated
+ *       401:
+ *         description: Session expired or invalid refresh token
+ */
+router.post('/refresh', AuthController.refresh);
+
+/**
+ * @swagger
  * /auth/me:
  *   get:
  *     summary: Fetch current authenticated user info

@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { logger } from '../utils/logger';
 import { ZodError } from 'zod';
+import { AppError } from '../utils/AppError';
 
 export interface CustomError extends Error {
   statusCode?: number;
@@ -17,8 +18,16 @@ export const errorHandler = (
   res: Response,
   next: NextFunction
 ): void => {
-  const statusCode = err.statusCode || 500;
-  const message = err.message || 'Internal Server Error';
+  let statusCode = err.statusCode || 500;
+  let message = err.message || 'Internal Server Error';
+  let status = statusCode >= 400 && statusCode < 500 ? 'fail' : 'error';
+
+  // Handle standardized AppError
+  if (err instanceof AppError) {
+    statusCode = err.statusCode;
+    message = err.message;
+    status = statusCode >= 400 && statusCode < 500 ? 'fail' : 'error';
+  }
 
   // Log error details using our custom logger
   logger.error(`Error on request [${req.method}] ${req.path}:`, err);
@@ -61,7 +70,7 @@ export const errorHandler = (
 
   // Fallback generic response
   res.status(statusCode).json({
-    status: 'error',
+    status,
     statusCode,
     message,
     // Hide stack trace in production for safety

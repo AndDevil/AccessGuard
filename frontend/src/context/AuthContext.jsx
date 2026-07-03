@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import api from '../services/api';
+import api, { registerLogoutCallback } from '../services/api';
 
 const AuthContext = createContext(null);
 
@@ -7,6 +7,13 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  // Register final session logout handler
+  useEffect(() => {
+    registerLogoutCallback(() => {
+      setUser(null);
+    });
+  }, []);
 
   // Checks for an active session (cookie authentication validation) on app load
   useEffect(() => {

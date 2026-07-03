@@ -14,6 +14,7 @@ const Dashboard = () => {
   // Modal configurations
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   // Filter configurations
   const [statusFilter, setStatusFilter] = useState('ALL');
@@ -42,6 +43,7 @@ const Dashboard = () => {
   const handleSubmitTask = async (payload) => {
     setApiError('');
     setApiSuccess('');
+    setIsSaving(true);
     try {
       if (editingTask) {
         // Edit flow
@@ -62,6 +64,8 @@ const Dashboard = () => {
       setEditingTask(null);
     } catch (err) {
       setApiError(err.message || 'Error occurred while saving task.');
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -222,6 +226,7 @@ const Dashboard = () => {
           onSubmit={handleSubmitTask}
           onClose={handleCloseModal}
           currentUser={user}
+          isSaving={isSaving}
         />
       )}
     </>
