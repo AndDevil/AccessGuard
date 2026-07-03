@@ -1,7 +1,6 @@
-# Base node image
-FROM node:20-alpine
+# Stage 1: Development target (supports hot-reload via tsx watch)
+FROM node:20-alpine AS development
 
-# Set working directory
 WORKDIR /app
 
 # Install OpenSSL library required by Prisma engines in Alpine
@@ -11,27 +10,51 @@ RUN apk add --no-cache openssl
 COPY package*.json ./
 COPY tsconfig.json ./
 
-# Install packages
+# Install all dependencies (including devDependencies like tsx)
 RUN npm install
 
-# Copy Prisma schema and generate client before copying source code
-# (This leverages Docker layer caching if schema doesn't change)
+# Copy Prisma schema and generate client
 COPY prisma ./prisma/
 RUN npx prisma generate
 
-# Copy source code
-COPY src ./src/
-COPY entrypoint.sh ./
-
-# Make entrypoint script executable
+# Copy source code and entrypoint
+COPY . .
 RUN chmod +x entrypoint.sh
 
-# Compile TypeScript
-RUN npm run build
-
-# Expose internal port
+# Expose internal Express port
 EXPOSE 5000
 
-# Set default startup entrypoint script
+ENTRYPOINT ["./entrypoint.sh"]
+# Default development command runs the tsx watcher
+CMD ["npm", "run", "dev"]
+
+
+# Stage 2: Production builder
+FROM development AS builder
+RUN npm run build
+
+
+# Stage 3: Production runner (minimal runtime environment)
+FROM node:20-alpine AS production
+
+WORKDIR /app
+
+RUN apk add --no-cache openssl
+
+COPY package*.json ./
+# Install only production dependencies
+RUN npm install --only=production
+
+# Copy client binary and schema
+COPY prisma ./prisma/
+RUN npx prisma generate
+
+# Copy built distribution from builder
+COPY --from=builder /app/dist ./dist
+COPY entrypoint.sh ./
+RUN chmod +x entrypoint.sh
+
+EXPOSE 5000
+
 ENTRYPOINT ["./entrypoint.sh"]
 CMD ["npm", "start"]
