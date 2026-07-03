@@ -40,7 +40,31 @@ AccessGuard is a full-stack internship portfolio project demonstrating a scalabl
 
 ---
 
-## 🛠️ Local Development Quickstart
+## 🐳 Docker Containerization Deployment (Recommended)
+
+To run the entire AccessGuard stack (Frontend, Backend, and Database) fully containerized with a single command:
+
+### 1. Copy Environment File
+In the root directory of the project, copy the environment template:
+```bash
+cp .env.example .env
+```
+*(The actual `.env` file should remain at the root of the project, as the Docker Compose orchestration layer reads it from there).*
+
+### 2. Build & Launch Containers
+Execute the following command at the root directory:
+```bash
+docker-compose up --build
+```
+This command builds the multi-stage frontend container, creates the backend container, mounts volumes for code hot-reloads, runs migrations automatically, and starts the services.
+
+### 3. Access Services
+- **React Frontend Dashboard**: 👉 **[http://localhost:3000](http://localhost:3000)** (mapped from container port 80).
+- **Backend API & Swagger Docs**: 👉 **[http://localhost:5050/api-docs](http://localhost:5050/api-docs)** (mapped from container port 5000).
+
+---
+
+## 🛠️ Local Host Development (Alternative)
 
 ### Step 1: Clone & Configure Database
 

@@ -2,7 +2,7 @@ import axios from 'axios';
 
 // Create a configured axios instance
 const api = axios.create({
-  baseURL: 'http://localhost:5050/api/v1',
+  baseURL: '/api/v1',
   withCredentials: true, // Crucial: automatically attach and receive HTTPOnly cookies
   headers: {
     'Content-Type': 'application/json',
